@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>여행 투표</title>
+<title>여행 투표 안정버전</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -22,9 +22,10 @@ button{padding:8px 12px;border:none;border-radius:8px;cursor:pointer;}
 </head>
 
 <body>
+
 <div class="container">
 
-<h2>🏖 여행 투표 (안정형)</h2>
+<h2>🏖 여행 투표 (안정모드)</h2>
 
 <div class="card">
   <h3>닉네임</h3>
@@ -46,7 +47,7 @@ button{padding:8px 12px;border:none;border-radius:8px;cursor:pointer;}
 <script>
 
 const SUPABASE_URL = "https://sxlehuikskjeputwjvsd.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIs...";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4bGVodWlrc2tqZXB1dHdqdnNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwMTkyMTksImV4cCI6MjA5NzU5NTIxOX0.HHjAQisaFyx5Nj9tJ3ZZxm5GZbIhnaHlb8WjEBoVM4M";
 
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -54,26 +55,37 @@ let me = localStorage.getItem("me") || "";
 
 function saveName(){
   me = document.getElementById("nameInput").value.trim();
-  if(!me) return alert("이름 입력");
+  if(!me) return alert("이름 입력 필요");
+
   localStorage.setItem("me", me);
   load();
 }
 
 async function load(){
 
-  const {data: places} = await client.from("places").select("*");
-  const {data: votes} = await client.from("votes").select("*");
+  const {data: places, error:pErr} = await client.from("places").select("*");
+  const {data: votes, error:vErr} = await client.from("votes").select("*");
+
+  if(pErr || vErr){
+    document.getElementById("list").innerHTML =
+      "<div class='card'>데이터 불러오기 실패 (RLS/키 확인)</div>";
+    console.log(pErr || vErr);
+    return;
+  }
+
+  const safePlaces = places || [];
+  const safeVotes = votes || [];
 
   const list = document.getElementById("list");
   list.innerHTML = "";
 
-  places.forEach(p=>{
+  safePlaces.forEach(p=>{
 
     const voteCount =
-      votes.filter(v=>v.place_id === p.id).length;
+      safeVotes.filter(v=>v.place_id === p.id).length;
 
     const myVote =
-      votes.find(v=>v.place_id === p.id && v.voter === me);
+      safeVotes.find(v=>v.place_id === p.id && v.voter === me);
 
     const div = document.createElement("div");
     div.className = "card";
@@ -81,7 +93,7 @@ async function load(){
     div.innerHTML = `
       <h3>${p.name}</h3>
       <div class="small">작성자: ${p.creator}</div>
-      <a href="${p.link}" target="_blank">지도</a>
+      <a href="${p.link}" target="_blank">지도보기</a>
 
       <div class="row">
         <b>👍 ${voteCount}</b>
@@ -97,7 +109,6 @@ async function load(){
         p.creator === me
         ? `
           <div style="margin-top:10px">
-            <button onclick="editPlace(${p.id})">수정</button>
             <button onclick="deletePlace(${p.id})">삭제</button>
           </div>
         `
@@ -110,7 +121,8 @@ async function load(){
 }
 
 async function addPlace(){
-  if(!me) return alert("닉네임 먼저");
+
+  if(!me) return alert("닉네임 먼저 입력");
 
   const name = document.getElementById("placeName").value.trim();
   const link = document.getElementById("placeLink").value.trim();
@@ -125,7 +137,8 @@ async function addPlace(){
 }
 
 async function vote(place_id){
-  if(!me) return alert("닉네임 먼저");
+
+  if(!me) return alert("닉네임 먼저 입력");
 
   await client.from("votes").insert({
     place_id,
@@ -135,42 +148,25 @@ async function vote(place_id){
   load();
 }
 
-async function unvote(vote_id){
+async function unvote(id){
+
   await client.from("votes")
-    .delete()
-    .eq("id", vote_id);
-
-  load();
-}
-
-async function deletePlace(id){
-  await client.from("places")
     .delete()
     .eq("id", id);
 
   load();
 }
 
-async function editPlace(id){
-
-  const newName = prompt("수정 이름");
-  const newLink = prompt("수정 링크");
-
-  if(!newName || !newLink) return;
+async function deletePlace(id){
 
   await client.from("places")
-    .update({name:newName, link:newLink})
+    .delete()
     .eq("id", id);
 
   load();
 }
 
 load();
-
-client.channel("live")
-.on("postgres_changes",{event:"*",schema:"public",table:"places"},load)
-.on("postgres_changes",{event:"*",schema:"public",table:"votes"},load)
-.subscribe();
 
 </script>
 
