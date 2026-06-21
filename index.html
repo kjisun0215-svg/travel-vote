@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>여행지 투표</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+*{
+  box-sizing:border-box;
+}
+
+body{
+  margin:0;
+  padding:20px;
+  background:#f5f7fb;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+.container{
+  max-width:800px;
+  margin:auto;
+}
+
+h1{
+  text-align:center;
+}
+
+.card{
+  background:white;
+  border-radius:12px;
+  padding:15px;
+  margin-bottom:15px;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+}
+
+input{
+  width:100%;
+  padding:12px;
+  margin:6px 0;
+  border:1px solid #ddd;
+  border-radius:8px;
+}
+
+button{
+  border:none;
+  border-radius:8px;
+  padding:10px 15px;
+  cursor:pointer;
+}
+
+.add-btn{
+  width:100%;
+  background:#2563eb;
+  color:white;
+  font-weight:bold;
+}
+
+.vote-btn{
+  background:#16a34a;
+  color:white;
+}
+
+.rank{
+  background:#fff7d6;
+  border:2px solid #facc15;
+}
+
+.vote-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-top:10px;
+}
+
+a{
+  text-decoration:none;
+}
+
+.loading{
+  text-align:center;
+  color:#666;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>🏖 여행지 투표</h1>
+
+<div class="card">
+
+<h3>후보 추가</h3>
+
+<input
+  id="placeName"
+  placeholder="예: 강릉"
+/>
+
+<input
+  id="placeLink"
+  placeholder="지도 링크 입력"
+/>
+
+<button
+  class="add-btn"
+  onclick="addPlace()">
+  후보 추가
+</button>
+
+</div>
+
+<div id="places">
+  <p class="loading">불러오는 중...</p>
+</div>
+
+</div>
+
+<script>
+
+const SUPABASE_URL =
+"https://sxlehuikskjeputwjvsd.supabase.co";
+
+const SUPABASE_ANON_KEY =
+"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4bGVodWlrc2tqZXB1dHdqdnNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwMTkyMTksImV4cCI6MjA5NzU5NTIxOX0.HHjAQisaFyx5Nj9tJ3ZZxm5GZbIhnaHlb8WjEBoVM4M";
+
+const client =
+supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
+
+async function loadPlaces(){
+
+  const {data,error} =
+  await client
+    .from("places")
+    .select("*")
+    .order("votes",{ascending:false});
+
+  if(error){
+    console.error(error);
+    document.getElementById("places").innerHTML =
+      "<p>데이터를 불러오지 못했습니다.</p>";
+    return;
+  }
+
+  const container =
+    document.getElementById("places");
+
+  container.innerHTML = "";
+
+  if(data.length===0){
+    container.innerHTML =
+      "<div class='card'>아직 등록된 여행지가 없습니다.</div>";
+    return;
+  }
+
+  data.forEach((place,index)=>{
+
+    const div =
+      document.createElement("div");
+
+    div.className =
+      index===0
+      ? "card rank"
+      : "card";
+
+    div.innerHTML = `
+      <h3>
+        ${index===0 ? "🏆 " : ""}
+        ${place.name}
+      </h3>
+
+      <p>
+        <a href="${place.link}" target="_blank">
+          📍 지도 보기
+        </a>
+      </p>
+
+      <div class="vote-row">
+        <strong>👍 ${place.votes}표</strong>
+
+        <button
+          class="vote-btn"
+          onclick="vote(${place.id}, ${place.votes})">
+          투표
+        </button>
+      </div>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+async function addPlace(){
+
+  const name =
+    document
+    .getElementById("placeName")
+    .value
+    .trim();
+
+  const link =
+    document
+    .getElementById("placeLink")
+    .value
+    .trim();
+
+  if(!name || !link){
+    alert("지역명과 링크를 입력하세요.");
+    return;
+  }
+
+  const {error} =
+  await client
+    .from("places")
+    .insert({
+      name:name,
+      link:link
+    });
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  document.getElementById("placeName").value="";
+  document.getElementById("placeLink").value="";
+
+  loadPlaces();
+}
+
+async function vote(id,currentVotes){
+
+  const {error} =
+  await client
+    .from("places")
+    .update({
+      votes: currentVotes + 1
+    })
+    .eq("id",id);
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  loadPlaces();
+}
+
+loadPlaces();
+
+client
+.channel("travel-vote")
+.on(
+  "postgres_changes",
+  {
+    event:"*",
+    schema:"public",
+    table:"places"
+  },
+  () => loadPlaces()
+)
+.subscribe();
+
+</script>
+
+</body>
+</html>
