@@ -1,71 +1,41 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>여행지 투표</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>여행 투표</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
-body{
-  margin:0;
-  padding:20px;
-  font-family:sans-serif;
-  background:#f5f7fb;
-}
-
-.container{
-  max-width:800px;
-  margin:auto;
-}
-
-.card{
-  background:#fff;
-  padding:15px;
-  border-radius:12px;
-  margin-bottom:12px;
-  box-shadow:0 2px 8px rgba(0,0,0,0.08);
-}
-
-input{
-  width:100%;
-  padding:10px;
-  margin:5px 0;
-}
-
-button{
-  padding:8px 12px;
-  border:none;
-  border-radius:8px;
-  cursor:pointer;
-}
-
+body{font-family:sans-serif;background:#f5f7fb;margin:0;padding:20px;}
+.container{max-width:800px;margin:auto;}
+.card{background:#fff;padding:15px;border-radius:12px;margin-bottom:12px;}
+input{width:100%;padding:10px;margin:5px 0;}
+button{padding:8px 12px;border:none;border-radius:8px;cursor:pointer;}
 .primary{background:#2563eb;color:#fff;}
 .green{background:#16a34a;color:#fff;}
-.gray{background:#aaa;color:#fff;}
-
-.row{display:flex;justify-content:space-between;align-items:center;}
+.gray{background:#999;color:#fff;}
+.row{display:flex;justify-content:space-between;align-items:center;margin-top:10px;}
 .small{font-size:12px;color:#666;}
 </style>
 </head>
 
 <body>
-
 <div class="container">
 
-<h2>🏖 여행지 투표</h2>
+<h2>🏖 여행 투표 (안정형)</h2>
 
 <div class="card">
   <h3>닉네임</h3>
-  <input id="nicknameInput" placeholder="이름 입력">
-  <button class="primary" onclick="saveNickname()">저장</button>
+  <input id="nameInput" placeholder="이름"/>
+  <button class="primary" onclick="saveName()">저장</button>
 </div>
 
 <div class="card">
   <h3>여행지 추가</h3>
-  <input id="name" placeholder="지역명">
-  <input id="link" placeholder="지도 링크">
+  <input id="placeName" placeholder="지역명"/>
+  <input id="placeLink" placeholder="링크"/>
   <button class="primary" onclick="addPlace()">추가</button>
 </div>
 
@@ -76,18 +46,16 @@ button{
 <script>
 
 const SUPABASE_URL = "https://sxlehuikskjeputwjvsd.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4bGVodWlrc2tqZXB1dHdqdnNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwMTkyMTksImV4cCI6MjA5NzU5NTIxOX0.HHjAQisaFyx5Nj9tJ3ZZxm5GZbIhnaHlb8WjEBoVM4M";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIs...";
 
-const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let myName = localStorage.getItem("nickname") || "";
+let me = localStorage.getItem("me") || "";
 
-function saveNickname(){
-  myName = document.getElementById("nicknameInput").value.trim();
-  if(!myName) return alert("닉네임 입력");
-
-  localStorage.setItem("nickname", myName);
-  alert("저장됨");
+function saveName(){
+  me = document.getElementById("nameInput").value.trim();
+  if(!me) return alert("이름 입력");
+  localStorage.setItem("me", me);
   load();
 }
 
@@ -101,8 +69,11 @@ async function load(){
 
   places.forEach(p=>{
 
-    const voteCount = votes.filter(v=>v.place_id === p.id).length;
-    const myVote = votes.find(v=>v.place_id === p.id && v.voter === myName);
+    const voteCount =
+      votes.filter(v=>v.place_id === p.id).length;
+
+    const myVote =
+      votes.find(v=>v.place_id === p.id && v.voter === me);
 
     const div = document.createElement("div");
     div.className = "card";
@@ -110,7 +81,7 @@ async function load(){
     div.innerHTML = `
       <h3>${p.name}</h3>
       <div class="small">작성자: ${p.creator}</div>
-      <a href="${p.link}" target="_blank">지도보기</a>
+      <a href="${p.link}" target="_blank">지도</a>
 
       <div class="row">
         <b>👍 ${voteCount}</b>
@@ -123,10 +94,10 @@ async function load(){
       </div>
 
       ${
-        p.creator === myName
+        p.creator === me
         ? `
           <div style="margin-top:10px">
-            <button onclick="editPlace(${p.id}, '${p.name}', '${p.link}')">수정</button>
+            <button onclick="editPlace(${p.id})">수정</button>
             <button onclick="deletePlace(${p.id})">삭제</button>
           </div>
         `
@@ -139,37 +110,32 @@ async function load(){
 }
 
 async function addPlace(){
+  if(!me) return alert("닉네임 먼저");
 
-  if(!myName) return alert("닉네임 먼저 입력");
-
-  const name = document.getElementById("name").value.trim();
-  const link = document.getElementById("link").value.trim();
-
-  if(!name || !link) return alert("입력 필요");
+  const name = document.getElementById("placeName").value.trim();
+  const link = document.getElementById("placeLink").value.trim();
 
   await client.from("places").insert({
     name,
     link,
-    creator: myName
+    creator: me
   });
 
   load();
 }
 
 async function vote(place_id){
-
-  if(!myName) return alert("닉네임 먼저 입력");
+  if(!me) return alert("닉네임 먼저");
 
   await client.from("votes").insert({
     place_id,
-    voter: myName
+    voter: me
   });
 
   load();
 }
 
 async function unvote(vote_id){
-
   await client.from("votes")
     .delete()
     .eq("id", vote_id);
@@ -178,9 +144,6 @@ async function unvote(vote_id){
 }
 
 async function deletePlace(id){
-
-  if(!confirm("삭제?")) return;
-
   await client.from("places")
     .delete()
     .eq("id", id);
@@ -188,10 +151,10 @@ async function deletePlace(id){
   load();
 }
 
-async function editPlace(id, name, link){
+async function editPlace(id){
 
-  const newName = prompt("수정", name);
-  const newLink = prompt("링크", link);
+  const newName = prompt("수정 이름");
+  const newLink = prompt("수정 링크");
 
   if(!newName || !newLink) return;
 
